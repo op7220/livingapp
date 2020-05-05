@@ -1,0 +1,394 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_poc/db/db_helper.dart';
+import 'package:flutter_poc/model/data_model.dart';
+import 'package:flutter_poc/model/receipt_record.dart';
+import 'package:flutter_poc/style/constant_values.dart';
+import 'package:flutter_poc/style/strings.dart';
+import 'package:flutter_poc/style/text_style.dart';
+import 'package:flutter_poc/ui/receipt_list.dart';
+import 'package:flutter_poc/util/app_tools.dart';
+import 'package:flutter_poc/util/shared_preference.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:intl/intl.dart';
+
+import 'bottom_nav.dart';
+
+class AddReceiptScreen extends StatefulWidget {
+  @override
+  _AddReceiptScreenState createState() => _AddReceiptScreenState();
+}
+
+class _AddReceiptScreenState extends State<AddReceiptScreen> {
+  var _formKey = GlobalKey<FormState>();
+  var scaffoldKey = GlobalKey<ScaffoldState>();
+  TextEditingController _nameController = new TextEditingController();
+  TextEditingController _quantityController = new TextEditingController();
+  TextEditingController _priceController = new TextEditingController();
+  TextEditingController _totalController = new TextEditingController();
+  Future<List<Data>> data;
+  List newData=new List();
+  var dbHelper;
+  bool isUpdating;
+  int curUserId;
+  String totalValue = '0.0';
+
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+    dbHelper = DBHelper();
+    isUpdating = false;
+    refreshList();
+  }
+
+  refreshList() {
+    setState(() {
+      data = dbHelper.getEmployees();
+    });
+  }
+@override
+  void dispose() {
+    // TODO: implement dispose
+    super.dispose();
+    dbHelper.close();
+  }
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Scaffold(
+        key: scaffoldKey,
+        appBar: AppBar(
+          leading: IconButton(
+              icon: Icon(
+                Icons.print,
+                color: Colors.blue,
+              ),
+              onPressed: () => Navigator.pushReplacement(context,
+                  MaterialPageRoute(builder: (context) => AddReceiptScreen()))),
+          title: Text(
+            "Receipt",
+            style: TextStyle(color: Colors.black, fontSize: d_20),
+          ),
+          centerTitle: true,
+          backgroundColor: Colors.white,
+          elevation: 0.7,
+          actions: <Widget>[
+            IconButton(
+                icon: Icon(
+                  Icons.save,
+                  color: Colors.black,
+                ),
+                onPressed: () {
+                  Data e = Data(
+                      null,
+                      _nameController.text,
+                      _quantityController.text,
+                      _priceController.text,
+                      _totalController.text);
+                  data.then((resp) {
+                    if (resp.isNotEmpty) {
+                      dbHelper.save(e);
+                      scaffoldKey.currentState.showSnackBar(new SnackBar(
+                          content: Text("Data saved successfully")));
+                    } else {
+                      scaffoldKey.currentState
+                          .showSnackBar(new SnackBar(content: Text("No data")));
+                    }
+                  });
+                })
+          ],
+        ),
+        // drawer: Drawer(),
+        bottomNavigationBar: BottomNav(),
+        body: new Container(
+          child: new ListView(
+            children: <Widget>[form(), list(), createInvoiceButton()],
+          ),
+        ),
+      ),
+    );
+  }
+
+  _textName(String data) {
+    return Expanded(
+      flex: data == product_name ? 1 : 1,
+      child: Container(
+          padding: pd_8,
+          child: Text(
+            data,
+            style: MediaQuery.of(context).size.width < 400
+                ? subHeaderStyle
+                : style1,
+          )),
+    );
+  }
+
+  form() {
+    return Form(
+        key: _formKey,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          verticalDirection: VerticalDirection.down,
+          children: <Widget>[
+            SizedBox(
+              height: d_20,
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: <Widget>[
+                _textName(product_name),
+                //  _textName(quantity),
+                _textField(_nameController),
+              ],
+            ),
+            SizedBox(
+              width: d_20,
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: <Widget>[
+                //_textField(_nameController),
+                _textName(quantity),
+                _textField(_quantityController),
+              ],
+            ),
+            SizedBox(
+              height: d_10,
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: <Widget>[
+                _textName(price),
+                _textField(_priceController),
+                //_textName(total),
+              ],
+            ),
+            SizedBox(
+              width: d_20,
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: <Widget>[
+                // _textField(_priceController),
+                _textName(total),
+                _textField(_totalController),
+                // IconButton(icon: Icon(Icons.m), onPressed: null)
+              ],
+            ),
+            SizedBox(
+              height: d_10,
+            ),
+            appButton(
+                btnTxt: add,
+                btnPadding:
+                    MediaQuery.of(context).size.width < 400 ? d_5 : d_10,
+                btnColor: Colors.black,
+                onBtnclicked: () {
+                  print(_nameController.text);
+
+                  _submit();
+                }),
+            SizedBox(
+              height: d_20,
+            ),
+          ],
+        ));
+  }
+
+  list() {
+    return FutureBuilder(
+      future: data,
+      builder: (context, snapshot) {
+        if (snapshot.hasData) {
+          return dataTable(snapshot.data);
+        }
+
+        if (null == snapshot.data || snapshot.data.length == 0) {
+          return Center(child: Text("No Data Found"));
+        }
+
+        return CircularProgressIndicator();
+      },
+    );
+  }
+
+  SingleChildScrollView dataTable(List<Data> data) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: DataTable(
+        columns: [
+          DataColumn(label: labelText(product_name)),
+          DataColumn(label: labelText(quantity)),
+          DataColumn(label: labelText(price)),
+          DataColumn(label: labelText(total)),
+         // DataColumn(label: Text("")),
+        ],
+        rows:data.map((data) {
+            return DataRow(cells: [
+              DataCell(
+                cellData(data.productName),
+              ),
+              DataCell(
+                cellData(data.productQnty),
+              ),
+              DataCell(
+                cellData(data.productPrice),
+              ),
+              DataCell(
+                cellData(data.productTotal),
+              ),
+              /*DataCell(
+                IconButton(
+                    icon: Icon(Icons.delete),
+                    onPressed: () {
+                      dbHelper.delete(data.id);
+                      refreshList();
+                    }),
+              ),*/
+            ]);
+          },
+        ).toList(),
+      ),
+    );
+  }
+
+  _textField(TextEditingController controller) {
+    return Expanded(
+      flex: _flexBox(controller),
+      child: Container(
+        margin: controller == _nameController
+            ? EdgeInsets.only(right: d_8)
+            : EdgeInsets.only(right: d_60),
+        height: MediaQuery.of(context).size.width < 400 ? d_60 : d_80,
+        padding: EdgeInsets.all(d_5),
+        child: TextField(
+          controller: controller,
+          // validator: (val) => val.length == 0 ? "Please Fill" : null,
+          onChanged: (val) {
+            setState(() {
+              double quant = double.parse(_quantityController.text.toString());
+              double priceValue = double.parse(_priceController.text);
+
+              totalValue = (quant * priceValue).toString();
+
+              print("======>${quant * priceValue}");
+            });
+          },
+
+          enabled: controller == _totalController ? false : true,
+          keyboardType: _inputType(controller),
+          decoration: InputDecoration(
+              labelText: _calculateValue(controller),
+              labelStyle: subHeaderStyle,
+              border: OutlineInputBorder()),
+        ),
+      ),
+    );
+  }
+
+ //submit button
+  _submit() {
+    if (_validateFiled()) {
+      _formKey.currentState.save();
+
+      if (isUpdating) {
+        Data e = Data(null, _nameController.text, _quantityController.text,
+            _priceController.text, totalValue);
+        dbHelper.update(e);
+        setState(() {
+          isUpdating = false;
+        });
+      } else {
+        Data e = Data(null, _nameController.text, _quantityController.text,
+            _priceController.text,totalValue);
+        dbHelper.save(e);
+      }
+      refreshList();
+      clearText();
+      // print(_nameController.text);
+    }
+  }
+
+  labelText(String value) {
+    return Expanded(
+      flex: 1,
+      child: Text(
+        value,
+        style:
+            MediaQuery.of(context).size.width < 400 ? subHeaderStyle : style1,
+      ),
+    );
+  }
+
+  cellData(String value) {
+    return Container(
+      child: Text(
+        value,
+        style: MediaQuery.of(context).size.width < 400
+            ? newsContentTextStyle
+            : subHeaderStyle,
+      ),
+    );
+  }
+
+  clearText() {
+    _nameController.text = '';
+    _priceController.text = '';
+    _quantityController.text = '';
+    totalValue = '';
+  }
+
+  int _flexBox(TextEditingController controller) {
+    if (controller == _nameController) {
+      return 3;
+    } else {
+      return 3;
+    }
+  }
+
+  String _calculateValue(TextEditingController controller) {
+    if (controller == _totalController) {
+      return totalValue;
+    }
+  }
+
+  TextInputType _inputType(TextEditingController controller) {
+    if (controller == _priceController ||
+        controller == _quantityController ||
+        controller == _totalController) {
+      return TextInputType.number;
+    } else {
+      return TextInputType.text;
+    }
+  }
+
+  Widget createInvoiceButton() {
+    return appButton(
+        btnTxt: create,
+        btnPadding: MediaQuery.of(context).size.width < 400 ? d_5 : d_10,
+        btnColor: Colors.black,
+        onBtnclicked: () {
+        var now=DateTime.now();
+
+        print(new DateFormat("dd-MM-yyyy").format(now));
+        });
+  }
+
+  //validation
+  bool _validateFiled() {
+    if (_nameController.text.isEmpty) {
+      Fluttertoast.showToast(msg: "Product name is empty");
+      return false;
+    }
+    if (_quantityController.text.isEmpty) {
+      Fluttertoast.showToast(msg: "Quantity is empty");
+      return false;
+    }
+    if (_priceController.text.isEmpty) {
+      Fluttertoast.showToast(msg: "Price is empty");
+      return false;
+    }
+    return true;
+  }
+}
